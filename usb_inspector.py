@@ -26,6 +26,7 @@ if DEBUG:
 SEPARATOR = "-" * 100
 
 
+
 class USBDevice:
     def __init__(self, device):
         self.vendor_id = device.idVendor
