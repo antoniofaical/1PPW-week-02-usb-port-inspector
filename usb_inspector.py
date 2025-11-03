@@ -1,8 +1,36 @@
 import sys
 import serial
 from serial.tools import list_ports
+import usb.core
+import usb.util
 
 SEPARATOR = "-" * 100
+
+
+def list_all_usb_devices():
+    """List every USB device recognized by the system."""
+    print("\nConnected USB devices:\n")
+    devices = usb.core.find(find_all=True)
+    if not devices:
+        print("   >> No USB devices detected.")
+        return
+    for i, dev in enumerate(devices, 1):
+        print(f"[{i}] VID:PID = {hex(dev.idVendor)}:{hex(dev.idProduct)}")
+        try:
+            manufacturer = usb.util.get_string(dev, dev.iManufacturer)
+        except:
+            manufacturer = "Unknown"
+        try:
+            product = usb.util.get_string(dev, dev.iProduct)
+        except:
+            product = "Unknown"
+        try:
+            serial = usb.util.get_string(dev, dev.iSerialNumber)
+        except:
+            serial = "Unknown"
+        print(f"     Manufacturer: {manufacturer}")
+        print(f"     Product:      {product}")
+        print(f"     Serial:       {serial}\n")
 
 
 def list_available_ports():
@@ -49,9 +77,9 @@ def read_serial(port_name, baudrate=115200):
     except KeyboardInterrupt:
         print("\nStopped by user.")
     except serial.SerialException as e:
-        print(f"\n   >> Serial error: {e}")
+        print(f"   >> Serial error: {e}")
     except Exception as e:
-        print(f"\n   >> Unexpected error: {e}")
+        print(f"   >> Unexpected error: {e}")
     finally:
         try:
             ser.close()
@@ -62,37 +90,51 @@ def read_serial(port_name, baudrate=115200):
 def main():
     """Main program loop for the USB Port Inspector CLI."""
     print("\n", SEPARATOR)
-    print("   USB Port Inspector (v0.2)")
-    print("   Detect, inspect, and read data from USB serial devices.")
-    print(SEPARATOR)
-
-    ports = list_available_ports()
-    if not ports:
-        sys.exit(0)
+    print("   USB Port Inspector (v0.3)")
+    print("   Inspect USB peripherals connected to your system.")
 
     while True:
         try:
             print("\n", SEPARATOR)
-            user_input = input("\n  Choose a port (number, name, or 'q' to quit): ").strip()
+            print("\n   Options:\n")
+            print("     [1] List serial devices (COM / ttyUSB)")
+            print("     [2] List all USB devices")
+            print("     [q] Quit")
 
-            if user_input.lower() == 'q':
-                print("\n   >> Exiting program...\n")
+            choice = input("\nChoose an option: ").strip().lower()
+
+            if choice == '1':
+
+                ports = list_available_ports()
+                if not ports:
+                    continue
+
+                user_input = input("\n  Choose a port (number or name): ").strip()
+
+                # Allow selection by index or by name (COMx, /dev/ttyUSBx, etc.)
+                if user_input.isdigit() and 1 <= int(user_input) <= len(ports):
+                    selected_port = ports[int(user_input) - 1].device
+                else:
+                    selected_port = user_input
+
+                port_info = get_port_info(selected_port)
+                if not port_info:
+                    continue
+
+                # Ask if user wants to open serial monitor
+                choice = input("\n   >> Read data from this port? (y/n): ").strip().lower()
+                if choice == 'y':
+                    read_serial(selected_port)
+
+            elif choice == '2':
+                list_all_usb_devices()
+            elif choice == 'q':
+                print("\nExiting program...\n")
                 break
-
-            # Allow selection by index or by name (COMx, /dev/ttyUSBx, etc.)
-            if user_input.isdigit() and 1 <= int(user_input) <= len(ports):
-                selected_port = ports[int(user_input) - 1].device
             else:
-                selected_port = user_input
+                print("Invalid option. Try again.")
 
-            port_info = get_port_info(selected_port)
-            if not port_info:
-                continue
 
-            # Ask if user wants to open serial monitor
-            choice = input("\n   >> Read data from this port? (y/n): ").strip().lower()
-            if choice == 'y':
-                read_serial(selected_port)
 
         except KeyboardInterrupt:
             print("\n\n   >> Interrupted by user. Exiting...\n")
